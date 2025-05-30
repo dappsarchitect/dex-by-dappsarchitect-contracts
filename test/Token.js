@@ -54,7 +54,7 @@ describe("Token", () => {
                 expect(await token.balanceOf(recipient.address)).to.equal(unitFixer(500000))
             })
 
-            it("emits Transfer event", async () => {
+            it("emits a Transfer event", async () => {
                 const { token, deployer, recipient } = await loadFixture(deployTokenFixture);
 
                 const transaction = await token.connect(deployer).transfer(recipient.address, unitFixer(500000))
@@ -75,11 +75,45 @@ describe("Token", () => {
             })
 
             it("rejects invalid recipient", async () => {
-                const { token, deployer, recipient } = await loadFixture(deployTokenFixture);
+                const { token, deployer } = await loadFixture(deployTokenFixture);
                 const INVALID_ADDRESS = "0x0000000000000000000000000000000000000000"
                 const ERROR = "Token: Recipient Is Address 0"
 
                 await expect(token.connect(deployer).transfer(INVALID_ADDRESS, unitFixer(500000))).to.be.revertedWith(ERROR)
+            })
+        })
+    })
+
+    describe("Approving Transferral of Tokens", () => {
+
+        describe("Success", () => {
+            it("approves transferral of tokens of certain amount", async () => {
+                const { token, deployer, delegate } = await loadFixture(deployTokenFixture);
+
+                const approval = await token.connect(deployer).approve(delegate.address, unitFixer(500000))
+                await approval.wait()
+
+                expect(await token.allowance(deployer.address, delegate.address)).to.equal(unitFixer(500000))
+            })
+
+            it("emits an Approval event", async () => {
+                const { token, deployer, delegate } = await loadFixture(deployTokenFixture);
+
+                const approval = await token.connect(deployer).approve(delegate.address, unitFixer(500000))
+                await approval.wait()
+
+                await expect(approval).to.emit(token, "Approval")
+                    .withArgs(deployer.address, delegate.address, unitFixer(500000))
+            })
+        })
+
+        describe("Failure", () => {
+            it("rejects invalid delegate address", async () => {
+                const { token, deployer } = await loadFixture(deployTokenFixture);
+                const INVALID_ADDRESS = "0x0000000000000000000000000000000000000000"
+                const ERROR = "Token: Delegate Spender Is Address 0"
+
+                await expect(token.connect(deployer).approve(INVALID_ADDRESS, unitFixer(500000))).to.be.revertedWith(ERROR)
             })
         })
     })
