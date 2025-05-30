@@ -10,6 +10,20 @@ async function deployTokenFixture() {
     return { token, deployer, recipient, delegate }
 }
 
+async function transferFromTokenFixture() {
+    const { token, deployer, recipient, delegate } = await deployTokenFixture()
+    const AMOUNT = ethers.parseUnits("500000", 18)
+
+    // Transaction is not needed for approval, so we wrap it in an await so we can still do .wait()
+    await (await token.connect(deployer).approve(delegate.address, AMOUNT)).wait()
+
+    const transaction = await token.connect(delegate).transferFrom(deployer.address, recipient.address, AMOUNT)
+    await transaction.wait()
+
+    return { token, deployer, recipient, delegate, transaction }
+}
+
 module.exports = {
-    deployTokenFixture
+    deployTokenFixture,
+    transferFromTokenFixture
 }
