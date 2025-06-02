@@ -54,7 +54,8 @@ contract Token {
     function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
         require(_from != address(0), "Token: Owner Is Address 0");
         
-        // requires msg.sender to have been approved; if not approved yet, allowance checked to be 0n with console.log
+        // requires msg.sender to have been approved
+        // if not approved yet, allowance checked to be 0n with console.log
         require(allowance[_from][msg.sender] != 0, "Token: No Approval for Transferral"); 
 
         require(allowance[_from][msg.sender] >= _value, "Token: Insufficient Allowance");
