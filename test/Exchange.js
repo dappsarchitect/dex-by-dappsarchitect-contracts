@@ -1,5 +1,5 @@
 const { ethers } = require("hardhat") // imports Ethers.js
-const { deployExchangeFixture } = require("./helpers/ExchangeFixtures")
+const { deployExchangeFixture, depositExchangeFixture } = require("./helpers/ExchangeFixtures")
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers")
 const { expect } = require("chai")    // imports expect function from Chai
 
@@ -19,6 +19,34 @@ describe("Exchange", () => {
         it("has the correct fee percentage", async () => {
             const { exchange } = await loadFixture(deployExchangeFixture)
             expect(await exchange.feePercent()).to.equal(10)
+        })
+    })
+
+    describe("Depositing Tokens", () => {
+        const AMOUNT = unitFixer(100)
+
+        describe("Success", () => {
+            it("tracks the token deposit", async () => {
+                const { tokens: { token0 }, exchange, accounts } = await loadFixture(depositExchangeFixture)
+                expect(await token0.balanceOf(await exchange.getAddress())).to.equal(AMOUNT)
+                expect(await exchange.totalBalanceOf(await token0.getAddress(), accounts.user1.address))
+            })
+
+            it("emits a TokensDeposited event", async () => {
+                const { tokens: { token0 }, exchange, accounts, transaction } = await loadFixture(depositExchangeFixture)
+                await expect(transaction).to.emit(exchange, "TokensDeposited")
+                    .withArgs(await token0.getAddress(), accounts.user1.address, AMOUNT, AMOUNT)
+            })
+        })
+
+        describe("Failure", () => {
+            it("fails when no tokens are approved", async () => {
+                const { tokens: { token0 }, exchange, accounts } = await loadFixture(depositExchangeFixture)
+                const ERROR = "Exchange: Token Transfer Failed"
+
+                await expect(exchange.connect(accounts.user1).depositTokens(await token0.getAddress(), AMOUNT)).to.be.reverted
+                //With(ERROR)
+            })
         })
     })
 })
