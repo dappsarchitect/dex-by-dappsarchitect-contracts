@@ -1,5 +1,5 @@
 const { ethers } = require("hardhat") // imports Ethers.js
-const { deployExchangeFixture, depositExchangeFixture } = require("./helpers/ExchangeFixtures")
+const { deployExchangeFixture, depositExchangeFixture, orderExchangeFixture } = require("./helpers/ExchangeFixtures")
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers")
 const { expect } = require("chai")    // imports expect function from Chai
 
@@ -83,6 +83,36 @@ describe("Exchange", () => {
                 const ERROR = "Exchange: Insufficient Funds on Exchange"
 
                 await expect(exchange.connect(accounts.user1).withdrawTokens(await token0.getAddress(), AMOUNT)).to.be.revertedWith(ERROR)
+            })
+        })
+    })
+    
+    describe("Making Orders", () => {
+        const AMOUNT = unitFixer(1)
+
+        describe("Success", () => {
+            it("tracks the newly created order", async () => {
+                const { exchange } = await loadFixture(orderExchangeFixture)
+                expect(await exchange.orderCount()).to.equal(1)
+            })
+
+            it("emits an OrderCreated event", async () => {
+                const { tokens: { token0, token1 }, exchange, accounts, transaction } = await loadFixture(orderExchangeFixture)
+
+                const ORDER_ID = 1
+                const { timestamp } = await ethers.provider.getBlock()
+
+                await expect(transaction).to.emit(exchange, "OrderCreated")
+                    .withArgs(ORDER_ID, accounts.user1.address, await token1.getAddress(), AMOUNT, await token0.getAddress(), AMOUNT, timestamp)
+            })
+        })
+
+        describe("Failure", () => {
+            it("fails for insufficient balance", async () => {
+                const { tokens: { token0, token1 }, exchange, accounts } = await loadFixture(deployExchangeFixture)
+                const ERROR = "Exchange: Insufficient Funds on Exchange"
+
+                await expect(exchange.connect(accounts.user1).makeOrder(await token1.getAddress(), AMOUNT, await token0.getAddress(), AMOUNT)).to.be.revertedWith(ERROR)
             })
         })
     })
