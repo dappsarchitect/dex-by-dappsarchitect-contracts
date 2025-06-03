@@ -115,5 +115,59 @@ describe("Exchange", () => {
                 await expect(exchange.connect(accounts.user1).makeOrder(await token1.getAddress(), AMOUNT, await token0.getAddress(), AMOUNT)).to.be.revertedWith(ERROR)
             })
         })
+    })  
+    
+    describe("Cancelling Orders", () => {
+        const AMOUNT = unitFixer(1)
+        const ORDER_ID = 1
+
+        describe("Success", () => {
+            it("updates cancelled orders", async () => {
+                const { exchange, accounts } = await loadFixture(orderExchangeFixture)
+
+                const transaction = await exchange.connect(accounts.user1).cancelOrder(ORDER_ID)
+                await transaction.wait()
+
+                expect(await exchange.isOrderCancelled(ORDER_ID)).to.equal(true)
+            })
+
+            it("emits an OrderCancelled event", async () => {
+                const { tokens: { token0, token1 }, exchange, accounts } = await loadFixture(orderExchangeFixture)
+
+                const transaction = await exchange.connect(accounts.user1).cancelOrder(ORDER_ID)
+                await transaction.wait()
+
+                const { timestamp } = await ethers.provider.getBlock()
+
+                await expect(transaction).to.emit(exchange, "OrderCancelled")
+                    .withArgs(ORDER_ID, accounts.user1.address, await token1.getAddress(), AMOUNT, await token0.getAddress(), AMOUNT, timestamp)
+            })
+        })
+
+        describe("Failure", () => {
+            it("rejects invalid order ID", async () => {
+                const { exchange, accounts } = await loadFixture(deployExchangeFixture)
+                const ERROR = "Exchange: Order Does Not Exist"
+
+                await expect(exchange.connect(accounts.user1).cancelOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+
+            it("rejects unauthorised cancelation", async () => {
+                const { exchange, accounts: { user2 } } = await loadFixture(orderExchangeFixture)
+                const ERROR = "Exchange: Not Your Order"
+
+                await expect(exchange.connect(user2).cancelOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+
+            it("rejects cancelling cancelled orders", async () => {
+                const { exchange, accounts } = await loadFixture(orderExchangeFixture)
+                const ERROR = "Exchange: Order Has Been Cancelled"
+
+                const transaction = await exchange.connect(accounts.user1).cancelOrder(ORDER_ID)
+                await transaction.wait()
+
+                await expect(exchange.connect(accounts.user1).cancelOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+        })
     })
 })

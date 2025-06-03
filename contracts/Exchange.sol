@@ -12,6 +12,7 @@ contract Exchange {
     mapping(address => mapping(address => uint256)) private userActiveTokenBalance;
 
     mapping(uint256 => Order) public orders;
+    mapping(uint256 => bool) public isOrderCancelled; // defaulted to be false when deployed
 
     struct Order {
         uint256 id;
@@ -26,6 +27,7 @@ contract Exchange {
     event TokensDeposited(address indexed token, address indexed user, uint256 amount, uint256 balance);
     event TokensWithdrawn(address indexed token, address indexed user, uint256 amount, uint256 balance);
     event OrderCreated(uint256 id, address user, address tokenGet, uint256 amountGet, address tokenGive, uint256 amountGive, uint256 timestamp);
+    event OrderCancelled(uint256 id, address user, address tokenGet, uint256 amountGet, address tokenGive, uint256 amountGive, uint256 timestamp);
 
     constructor(address _feeAccount, uint256 _feePercent) {
         feeAccount = _feeAccount;
@@ -59,5 +61,18 @@ contract Exchange {
         orders[orderCount] = Order(orderCount, msg.sender, _tokenGet, _amountGet, _tokenGive, _amountGive, block.timestamp);
         userActiveTokenBalance[_tokenGive][msg.sender] += _amountGive;
         emit OrderCreated(orderCount, msg.sender, _tokenGet, _amountGet, _tokenGive, _amountGive, block.timestamp);
+    }
+
+    function cancelOrder(uint256 _id) public {
+        Order storage order = orders[_id];
+        require(order.id == _id, "Exchange: Order Does Not Exist");
+        require(address(order.user) == msg.sender, "Exchange: Not Your Order");
+        require(isOrderCancelled[_id] == false, "Exchange: Order Has Been Cancelled");
+        isOrderCancelled[_id] = true;
+        userActiveTokenBalance[order.tokenGive][msg.sender] -= order.amountGive;
+        emit OrderCancelled(_id, msg.sender, order.tokenGet, order.amountGet, order.tokenGive, order.amountGive, block.timestamp);
+
+        //require(totalBalanceOf(_tokenGive, msg.sender) >= activeBalanceOf(_tokenGive, msg.sender) + _amountGive, "Exchange: Insufficient Funds on Exchange");
+        //orders[orderCount] = Order(orderCount, msg.sender, _tokenGet, _amountGet, _tokenGive, _amountGive, block.timestamp);
     }
 }
