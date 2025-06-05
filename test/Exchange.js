@@ -88,7 +88,7 @@ describe("Exchange", () => {
     })
     
     describe("Making Orders", () => {
-        const AMOUNT = unitFixer(1)
+        const AMOUNT = unitFixer(10)
 
         describe("Success", () => {
             it("tracks the newly created order", async () => {
@@ -118,7 +118,7 @@ describe("Exchange", () => {
     })  
     
     describe("Cancelling Orders", () => {
-        const AMOUNT = unitFixer(1)
+        const AMOUNT = unitFixer(10)
         const ORDER_ID = 1
 
         describe("Success", () => {
@@ -167,6 +167,94 @@ describe("Exchange", () => {
                 await transaction.wait()
 
                 await expect(exchange.connect(accounts.user1).cancelOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+        })
+    })
+    
+    describe("Filling Orders", () => {
+        const AMOUNT1 = unitFixer(10)
+        const AMOUNT2 = unitFixer(89)
+        const AMOUNT3 = unitFixer(90)
+        const AMOUNT4 = unitFixer(1)
+        const AMOUNT5 = unitFixer(100)
+        const ORDER_ID = 1
+
+        describe("Success", () => {
+            it("updates filled orders", async () => {
+                const { exchange, accounts } = await loadFixture(orderExchangeFixture)
+
+                const transaction = await exchange.connect(accounts.user2).fillOrder(ORDER_ID)
+                await transaction.wait()
+
+                expect(await exchange.isOrderFilled(ORDER_ID)).to.equal(true)
+            })
+
+            it("executes the trade and charge fees", async () => {
+                const { tokens: { token0, token1 }, exchange, accounts } = await loadFixture(orderExchangeFixture)
+
+                const transaction = await exchange.connect(accounts.user2).fillOrder(ORDER_ID)
+                await transaction.wait()
+
+                // For tokenGet
+                expect(await exchange.totalBalanceOf(await token1.getAddress(), accounts.user1.address)).to.equal(AMOUNT1)
+                expect(await exchange.totalBalanceOf(await token1.getAddress(), accounts.user2.address)).to.equal(AMOUNT2)
+                expect(await exchange.totalBalanceOf(await token1.getAddress(), accounts.feeAccount.address)).to.equal(AMOUNT4)
+
+                // For tokenGive
+                expect(await exchange.totalBalanceOf(await token0.getAddress(), accounts.user1.address)).to.equal(AMOUNT3)
+                expect(await exchange.totalBalanceOf(await token0.getAddress(), accounts.user2.address)).to.equal(AMOUNT1)
+                expect(await exchange.totalBalanceOf(await token0.getAddress(), accounts.feeAccount.address)).to.equal(0)
+
+                expect(await exchange.activeBalanceOf(await token0.getAddress(), accounts.user1.address)).to.equal(0)
+            })
+
+            it("emits an OrderFilled event", async () => {
+                const { tokens: { token0, token1 }, exchange, accounts } = await loadFixture(orderExchangeFixture)
+
+                const transaction = await exchange.connect(accounts.user2).fillOrder(ORDER_ID)
+                await transaction.wait()
+
+                const { timestamp } = await ethers.provider.getBlock()
+
+                await expect(transaction).to.emit(exchange, "OrderFilled")
+                    .withArgs(ORDER_ID, accounts.user1.address, accounts.user2.address, await token1.getAddress(), AMOUNT1, await token0.getAddress(), AMOUNT1, timestamp)
+            })
+        })
+
+        describe("Failure", () => {
+            it("rejects invalid order ID", async () => {
+                const { exchange, accounts } = await loadFixture(deployExchangeFixture)
+                const ERROR = "Exchange: Order Does Not Exist"
+
+                await expect(exchange.connect(accounts.user2).fillOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+
+            it("rejects filling cancelled orders", async () => {
+                const { exchange, accounts } = await loadFixture(orderExchangeFixture)
+                const ERROR = "Exchange: Order Has Been Cancelled"
+
+                await (await exchange.connect(accounts.user1).cancelOrder(ORDER_ID)).wait()
+
+                await expect(exchange.connect(accounts.user2).fillOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+
+            it("rejects filling filled orders", async () => {
+                const { exchange, accounts } = await loadFixture(orderExchangeFixture)
+                const ERROR = "Exchange: Order Has Been Filled"
+
+                await (await exchange.connect(accounts.user2).fillOrder(ORDER_ID)).wait()
+
+                await expect(exchange.connect(accounts.user2).fillOrder(ORDER_ID)).to.be.revertedWith(ERROR)
+            })
+
+            it("fails for insufficient balance", async () => {
+                const { tokens: { token1 }, exchange, accounts } = await loadFixture(orderExchangeFixture)
+                const ERROR = "Exchange: Insufficient Funds on Exchange"
+
+                const transaction = await exchange.connect(accounts.user2).withdrawTokens(await token1.getAddress(), AMOUNT5)
+                await transaction.wait()
+
+                await expect(exchange.connect(accounts.user2).fillOrder(ORDER_ID)).to.be.revertedWith(ERROR)
             })
         })
     })

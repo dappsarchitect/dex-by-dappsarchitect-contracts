@@ -45,7 +45,7 @@ async function depositExchangeFixture() {
 
 async function orderExchangeFixture() {
     const { tokens, exchange, accounts } = await depositExchangeFixture()
-    const AMOUNT = ethers.parseUnits("1", 18)
+    const AMOUNT = ethers.parseUnits("10", 18)
 
     // make order; we need the transaction variable to test in our unit test
     const transaction = await exchange.connect(accounts.user1).makeOrder(
